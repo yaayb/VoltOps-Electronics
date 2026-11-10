@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("CUSTOMER") // ADMIN | STAFF | CUSTOMER
+  createdAt    DateTime @default(now())
+  orders       Order[]
+}
+
+model StoreSetting {
+  id                    String   @id @default("singleton")
+  storeName             String   @default("VoltOps Electronics")
+  freeShippingThreshold Float    @default(500)
+  lowStockThreshold     Int      @default(3)
+  taxRatePercent        Float    @default(0)
+  updatedAt             DateTime @updatedAt
+}
+
+model Product {
+  id             String       @id @default(cuid())
+  sku            String       @unique
+  name           String
+  brand          String
+  category       String       // Laptops | Smartphones | Tablets | Gaming | Audio
+  price          Float
+  stock          Int          @default(0)
+  warrantyMonths Int          @default(12)
+  visible        Boolean      @default(true)
+  featured       Boolean      @default(false)
+  specProcessor  String
+  specMemory     String
+  specDisplay    String
+  imageUrl       String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  serialUnits    SerialUnit[]
+  orderItems     OrderItem[]
+}
+
+model SerialUnit {
+  id            String      @id @default(cuid())
+  serial        String      @unique
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  status        String      @default("IN_STOCK") // IN_STOCK | SOLD | RMA
+  orderId       String?
+  order         Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderItemId   String?
+  orderItem     OrderItem?  @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  customerName  String?
+  soldAt        DateTime?
+  warrantyUntil DateTime?
+  createdAt     DateTime    @default(now())
+  rmaTickets    RmaTicket[]
+}
+
+model PromoCode {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  type      String   // PERCENT | FIXED
+  value     Float
+  minSpend  Float    @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id              String       @id @default(cuid())
+  orderNumber     String       @unique
+  channel         String       // STOREFRONT | POS
+  userId          String?
+  user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customerName    String
+  customerEmail   String
+  shippingAddress String
+  paymentMethod   String
+  promoCode       String?
+  status          String       @default("PENDING") // PENDING | PACKED | SHIPPED | COMPLETED
+  subtotal        Float
+  discount        Float        @default(0)
+  shippingFee     Float        @default(0)
+  taxAmount       Float        @default(0)
+  total           Float
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  items           OrderItem[]
+  serialUnits     SerialUnit[]
+}
+
+model OrderItem {
+  id             String       @id @default(cuid())
+  orderId        String
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id])
+  sku            String
+  productName    String
+  unitPrice      Float
+  quantity       Int
+  warrantyMonths Int
+  serialNumbers  String       // JSON array of allocated serial numbers
+  serialUnits    SerialUnit[]
+}
+
+model RmaTicket {
+  id               String     @id @default(cuid())
+  ticketNumber     String     @unique
+  serialUnitId     String
+  serialUnit       SerialUnit @relation(fields: [serialUnitId], references: [id], onDelete: Cascade)
+  customerName     String
+  issueDescription String
+  technicianNotes  String     @default("")
+  status           String     @default("RECEIVED") // RECEIVED | DIAGNOSING | REPAIRING | RESOLVED
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
